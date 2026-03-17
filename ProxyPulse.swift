@@ -266,7 +266,7 @@ struct ContentView: View {
 
     var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
+            Image(systemName: "network")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.accentColor)
             Text("Proxy Pulse").font(.system(size: 15, weight: .bold))
@@ -586,7 +586,7 @@ class AppDel: NSObject, NSApplicationDelegate {
         // Status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let btn = statusItem.button {
-            btn.image = NSImage(systemSymbolName: "antenna.radiowaves.left.and.right",
+            btn.image = NSImage(systemSymbolName: "network",
                                 accessibilityDescription: "Proxy Pulse")
             btn.image?.size = NSSize(width: 16, height: 16)
             btn.action = #selector(togglePopover)
