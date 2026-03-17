@@ -61,6 +61,7 @@ class VM: ObservableObject {
     @Published var myIP: IPGeo?
     @Published var lookupResult: IPGeo?
     @Published var lookupInput = ""
+    @Published var expectedEgressIP = ""
     @Published var sites: [Site] = []
     @Published var channels: [ChanStatus] = []
     @Published var fetchingIP = false
@@ -145,6 +146,10 @@ class VM: ObservableObject {
             defer { lookingUp = false }
             if let g = await geo(s) { lookupResult = g } else { lookupFailed = true }
         }
+    }
+
+    func setExpectedEgressIP(_ raw: String) {
+        expectedEgressIP = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func runTests() {
@@ -318,7 +323,18 @@ struct ContentView: View {
             if vm.fetchingIP { loader("正在戳…") }
             else if let ip = vm.myIP {
                 ipLine(ip)
-                egressIPCheck(currentIP: ip.ip, expectedInput: vm.lookupInput)
+                HStack(spacing: 6) {
+                    TextField("输入要校验的出口IP", text: $vm.expectedEgressIP)
+                        .textFieldStyle(.plain).font(T.mono(12)).padding(6)
+                        .background(T.subtle.opacity(0.5)).cornerRadius(6)
+                        .onSubmit { vm.setExpectedEgressIP(vm.expectedEgressIP) }
+                    Button(action: { vm.setExpectedEgressIP(vm.expectedEgressIP) }) {
+                        Text("提交校验IP").font(T.f(12, .semibold)).foregroundColor(.white)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(T.accent).cornerRadius(6)
+                    }.buttonStyle(.plain)
+                }
+                egressIPCheck(currentIP: ip.ip, expectedInput: vm.expectedEgressIP)
             }
             else if vm.ipFailed {
                 Text("获取失败").font(T.f(12)).foregroundColor(T.fail)
@@ -396,8 +412,13 @@ struct ContentView: View {
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(T.accent).cornerRadius(6)
                     }.buttonStyle(.plain)
+                    Button(action: { vm.setExpectedEgressIP(vm.lookupInput) }) {
+                        Text("设为校验IP").font(T.f(12, .semibold)).foregroundColor(T.accent)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(T.accent.opacity(0.10)).cornerRadius(6)
+                    }.buttonStyle(.plain)
                 }
-                egressIPCheck(currentIP: vm.myIP?.ip, expectedInput: vm.lookupInput)
+                egressIPCheck(currentIP: vm.myIP?.ip, expectedInput: vm.expectedEgressIP)
                 if vm.lookingUp { loader("查询中…") }
                 else if let r = vm.lookupResult { ipLine(r) }
                 else if vm.lookupFailed {
