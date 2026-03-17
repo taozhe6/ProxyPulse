@@ -60,7 +60,8 @@ struct ChanStatus: Identifiable {
 class VM: ObservableObject {
     @Published var myIP: IPGeo?
     @Published var lookupResult: IPGeo?
-    @Published var lookupInput = "64.118.153.133"
+    @Published var lookupInput = ""
+    @Published var expectedEgressIP = ""
     @Published var sites: [Site] = []
     @Published var channels: [ChanStatus] = []
     @Published var fetchingIP = false
@@ -77,8 +78,13 @@ class VM: ObservableObject {
         ("statsig.anthropic.com", "Claude"), ("sentry.io", "Claude"),
         ("platform.claude.com", "Claude"), ("code.claude.com", "Claude"),
     ]
+    static let expectedEgressIPKey = "proxyPulse.expectedEgressIP"
 
     init() {
+        let savedExpected = (UserDefaults.standard.string(forKey: Self.expectedEgressIPKey) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        expectedEgressIP = savedExpected
+        lookupInput = savedExpected
         sites = Self.domains.map { Site(domain: $0.0, tag: $0.1) }
         channels = [
             ChanStatus(name: "网页端", icon: "🌐", note: "小火箭管控", ok: nil, detail: "检测中..."),
@@ -144,6 +150,23 @@ class VM: ObservableObject {
         Task {
             defer { lookingUp = false }
             if let g = await geo(s) { lookupResult = g } else { lookupFailed = true }
+        }
+    }
+
+    func setExpectedEgressIP(_ raw: String) {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        expectedEgressIP = value
+        lookupInput = value
+        if value.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.expectedEgressIPKey)
+        } else {
+            UserDefaults.standard.set(value, forKey: Self.expectedEgressIPKey)
+        }
+    }
+
+    func prefillLookupFromExpected() {
+        if !expectedEgressIP.isEmpty {
+            lookupInput = expectedEgressIP
         }
     }
 
@@ -316,7 +339,22 @@ struct ContentView: View {
                 refreshBtn { vm.fetchMyIP() }
             }
             if vm.fetchingIP { loader("正在戳…") }
-            else if let ip = vm.myIP { ipLine(ip) }
+            else if let ip = vm.myIP {
+                ipLine(ip)
+                HStack(spacing: 6) {
+                    TextField("输入要校验的出口IP（可保存）", text: $vm.expectedEgressIP)
+                        .textFieldStyle(.roundedBorder).font(T.mono(12))
+                        .onSubmit { vm.setExpectedEgressIP(vm.expectedEgressIP) }
+                    Button(action: { vm.setExpectedEgressIP(vm.expectedEgressIP) }) {
+                        Text("保存").font(T.f(12, .semibold)).foregroundColor(.white)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(T.accent).cornerRadius(6)
+                    }.buttonStyle(.plain)
+                }
+                Text("已保存的校验IP会自动预填到“查一个 IP”")
+                    .font(T.f(10)).foregroundColor(T.txt2)
+                egressIPCheck(currentIP: ip.ip, expectedInput: vm.expectedEgressIP)
+            }
             else if vm.ipFailed {
                 Text("获取失败").font(T.f(12)).foregroundColor(T.fail)
             }
@@ -373,7 +411,11 @@ struct ContentView: View {
 
     var lookupSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { vm.showLookup.toggle() } }) {
+            Button(action: {
+                let next = !vm.showLookup
+                withAnimation(.easeInOut(duration: 0.2)) { vm.showLookup = next }
+                if next { vm.prefillLookupFromExpected() }
+            }) {
                 HStack {
                     Text("🔍").font(.system(size: 14))
                     Text("查一个 IP").font(T.f(13, .bold)).foregroundColor(T.accent)
@@ -384,9 +426,8 @@ struct ContentView: View {
             }.buttonStyle(.plain)
             if vm.showLookup {
                 HStack(spacing: 6) {
-                    TextField("IP", text: $vm.lookupInput)
-                        .textFieldStyle(.plain).font(T.mono(12)).padding(6)
-                        .background(T.subtle.opacity(0.5)).cornerRadius(6)
+                    TextField("输入要查询的IP", text: $vm.lookupInput)
+                        .textFieldStyle(.roundedBorder).font(T.mono(12))
                         .onSubmit { vm.lookup() }
                     Button(action: { vm.lookup() }) {
                         Text("查").font(T.f(12, .semibold)).foregroundColor(.white)
@@ -428,6 +469,30 @@ struct ContentView: View {
             Spacer()
             if let org = g.org {
                 Text(org).font(T.f(10)).foregroundColor(T.txt2.opacity(0.7)).lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    func egressIPCheck(currentIP: String?, expectedInput: String) -> some View {
+        let expected = expectedInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let actual = (currentIP ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasExpected = !expected.isEmpty
+        let matched = hasExpected && !actual.isEmpty && actual == expected
+        HStack(spacing: 6) {
+            Text("目标出口IP")
+                .font(T.f(11, .semibold))
+                .foregroundColor(T.txt)
+            Text(hasExpected ? expected : "未设置")
+                .font(T.mono(11))
+                .foregroundColor(T.txt2)
+            Spacer()
+            if !hasExpected {
+                pill("待设置", T.warn)
+            } else if actual.isEmpty {
+                pill("未知", T.warn)
+            } else {
+                pill(matched ? "匹配" : "不匹配", matched ? T.ok : T.fail)
             }
         }
     }
