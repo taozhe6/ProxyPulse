@@ -77,6 +77,7 @@ class VM: ObservableObject {
         ("statsig.anthropic.com", "Claude"), ("sentry.io", "Claude"),
         ("platform.claude.com", "Claude"), ("code.claude.com", "Claude"),
     ]
+    static let requiredEgressIP = "64.118.153.133"
 
     init() {
         sites = Self.domains.map { Site(domain: $0.0, tag: $0.1) }
@@ -316,7 +317,10 @@ struct ContentView: View {
                 refreshBtn { vm.fetchMyIP() }
             }
             if vm.fetchingIP { loader("正在戳…") }
-            else if let ip = vm.myIP { ipLine(ip) }
+            else if let ip = vm.myIP {
+                ipLine(ip)
+                egressIPCheck(ip.ip)
+            }
             else if vm.ipFailed {
                 Text("获取失败").font(T.f(12)).foregroundColor(T.fail)
             }
@@ -429,6 +433,22 @@ struct ContentView: View {
             if let org = g.org {
                 Text(org).font(T.f(10)).foregroundColor(T.txt2.opacity(0.7)).lineLimit(1)
             }
+        }
+    }
+
+    @ViewBuilder
+    func egressIPCheck(_ currentIP: String?) -> some View {
+        let expected = VM.requiredEgressIP
+        let matched = (currentIP ?? "") == expected
+        HStack(spacing: 6) {
+            Text("目标出口IP")
+                .font(T.f(11, .semibold))
+                .foregroundColor(T.txt)
+            Text(expected)
+                .font(T.mono(11))
+                .foregroundColor(T.txt2)
+            Spacer()
+            pill(matched ? "匹配" : "不匹配", matched ? T.ok : T.fail)
         }
     }
 
