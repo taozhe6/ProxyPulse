@@ -1,6 +1,8 @@
 import Cocoa
 import SwiftUI
 
+// MARK: - Network helpers
+
 class NoRedir: NSObject, URLSessionTaskDelegate {
     func urlSession(_ s: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection r: HTTPURLResponse,
@@ -15,25 +17,6 @@ let probeSess: URLSession = {
     c.timeoutIntervalForRequest = 8
     return URLSession(configuration: c, delegate: NoRedir(), delegateQueue: nil)
 }()
-
-// MARK: - Theme
-
-enum T {
-    static let bg      = Color(red: 0.98, green: 0.96, blue: 0.93)
-    static let card    = Color.white
-    static let accent  = Color(red: 0.90, green: 0.38, blue: 0.22)
-    static let ok      = Color(red: 0.20, green: 0.72, blue: 0.40)
-    static let warn    = Color(red: 0.93, green: 0.60, blue: 0.15)
-    static let fail    = Color(red: 0.84, green: 0.22, blue: 0.22)
-    static let txt     = Color(red: 0.15, green: 0.14, blue: 0.13)
-    static let txt2    = Color(red: 0.52, green: 0.49, blue: 0.45)
-    static let subtle  = Color(red: 0.92, green: 0.90, blue: 0.87)
-    static let shadow  = Color.black.opacity(0.06)
-    static func f(_ s: CGFloat, _ w: Font.Weight = .regular) -> Font {
-        .system(size: s, weight: w, design: .rounded)
-    }
-    static func mono(_ s: CGFloat) -> Font { .system(size: s, design: .monospaced) }
-}
 
 // MARK: - Models
 
@@ -87,9 +70,9 @@ class VM: ObservableObject {
         lookupInput = savedExpected
         sites = Self.domains.map { Site(domain: $0.0, tag: $0.1) }
         channels = [
-            ChanStatus(name: "网页端", icon: "🌐", note: "小火箭管控", ok: nil, detail: "检测中..."),
-            ChanStatus(name: "终端", icon: "⬛", note: "env var", ok: nil, detail: "检测中..."),
-            ChanStatus(name: "桌面应用", icon: "🖥", note: "launchctl", ok: nil, detail: "检测中..."),
+            ChanStatus(name: "网页端", icon: "globe", note: "小火箭管控", ok: nil, detail: "检测中..."),
+            ChanStatus(name: "终端", icon: "terminal", note: "env var", ok: nil, detail: "检测中..."),
+            ChanStatus(name: "桌面应用", icon: "desktopcomputer", note: "launchctl", ok: nil, detail: "检测中..."),
         ]
         detectChannels()
     }
@@ -113,11 +96,11 @@ class VM: ObservableObject {
             let elecOK = !lcProxy.isEmpty
 
             let next = [
-                ChanStatus(name: "网页端", icon: "🌐", note: "小火箭管控",
+                ChanStatus(name: "网页端", icon: "globe", note: "小火箭管控",
                            ok: webOK, detail: webOK ? "系统代理已开启" : "系统代理未开启"),
-                ChanStatus(name: "终端", icon: "⬛", note: "env var",
+                ChanStatus(name: "终端", icon: "terminal", note: "env var",
                            ok: termOK, detail: termOK ? termProxy! : "未设置 → proxy_on"),
-                ChanStatus(name: "桌面应用", icon: "🖥", note: "launchctl",
+                ChanStatus(name: "桌面应用", icon: "desktopcomputer", note: "launchctl",
                            ok: elecOK, detail: elecOK ? lcProxy : "未设置 → 运行 install.sh"),
             ]
 
@@ -185,12 +168,21 @@ class VM: ObservableObject {
             let claudeOK = claudeAll.allSatisfy { if case .ok = $0.state { return true }; return false }
             let claudeFail = claudeAll.filter { if case .ok = $0.state { return false }; return true }.count
 
-            if okN == sites.count      { summary = "全部畅通! 放心打开 Claude 🎉" }
-            else if claudeOK           { summary = "Claude 可用, 部分基准站不通 🤔" }
-            else if claudeFail > 0     { summary = "Claude 有 \(claudeFail) 个域名不通 🔧" }
-            else                       { summary = "全军覆没 — 检查网络和代理 🔌" }
+            if okN == sites.count      { summary = "全部畅通! 放心打开 Claude" }
+            else if claudeOK           { summary = "Claude 可用, 部分基准站不通" }
+            else if claudeFail > 0     { summary = "Claude 有 \(claudeFail) 个域名不通" }
+            else                       { summary = "全军覆没 — 检查网络和代理" }
             testing = false
         }
+    }
+
+    /// Quick overall status for menu bar icon
+    var overallOK: Bool? {
+        if testing { return nil }
+        if sites.isEmpty { return nil }
+        let claudeSites = sites.filter { $0.tag == "Claude" }
+        if claudeSites.isEmpty { return nil }
+        return claudeSites.allSatisfy { if case .ok = $0.state { return true }; return false }
     }
 
     private func geo(_ ip: String?) async -> IPGeo? {
@@ -235,19 +227,7 @@ class VM: ObservableObject {
     }
 }
 
-// MARK: - Card
-
-struct CardMod: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.horizontal, 14).padding(.vertical, 12)
-            .background(T.card).cornerRadius(12)
-            .shadow(color: T.shadow, radius: 8, y: 3)
-    }
-}
-extension View { func card() -> some View { modifier(CardMod()) } }
-
-// MARK: - Content View
+// MARK: - Content View (popover)
 
 struct ContentView: View {
     @StateObject private var vm = VM()
@@ -257,88 +237,94 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header.padding(.top, 10).padding(.bottom, 6)
+            header.padding(.top, 12).padding(.bottom, 8)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 14) {
+                VStack(spacing: 10) {
                     channelCard
                     ipCard
                     healthCard
                     lookupSection
                 }
-                .padding(.horizontal, 20).padding(.bottom, 14)
+                .padding(.horizontal, 14).padding(.bottom, 10)
             }
 
             footer
         }
-        .background(
-            ZStack {
-                T.bg
-                LinearGradient(colors: [T.accent.opacity(0.05), .clear],
-                               startPoint: .topLeading, endPoint: .center)
-            }
-        )
-        .frame(minWidth: 460, idealWidth: 520, minHeight: 700, idealHeight: 736)
+        .background(.regularMaterial)
+        .frame(width: 370, height: 520)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) { appeared = true }
+            withAnimation(.easeOut(duration: 0.4)) { appeared = true }
             expectedEgressDraft = vm.expectedEgressIP
             editingExpectedIP = vm.expectedEgressIP.isEmpty
             vm.boot()
         }
+        .environmentObject(vm)
     }
 
+    // MARK: Header
+
     var header: some View {
-        HStack(spacing: 5) {
-            Text("🧭").font(.system(size: 22))
-                .rotationEffect(.degrees(appeared ? 0 : -25))
-                .animation(.interpolatingSpring(stiffness: 70, damping: 7).delay(0.15), value: appeared)
-            Text("Proxy Pulse").font(T.f(20, .heavy)).foregroundColor(T.txt)
+        HStack(spacing: 6) {
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.accentColor)
+            Text("Proxy Pulse").font(.system(size: 15, weight: .bold))
             Spacer()
-            Text("只读诊断 · 关掉无副作用").font(T.f(10)).foregroundColor(T.txt2)
+            Text("只读诊断").font(.system(size: 10)).foregroundColor(.secondary)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 14)
     }
 
     // MARK: 三通道
 
     var channelCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("三通道代理状态").font(T.f(13, .bold)).foregroundColor(T.accent)
+                Label("三通道代理状态", systemImage: "network")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.primary)
                 Spacer()
                 refreshBtn { vm.detectChannels() }
             }
             ForEach(Array(vm.channels.enumerated()), id: \.element.id) { i, ch in
-                HStack(spacing: 8) {
-                    Text(ch.icon).font(.system(size: 14))
+                HStack(spacing: 6) {
+                    Image(systemName: ch.icon)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 4) {
-                            Text(ch.name).font(T.f(12, .semibold)).foregroundColor(T.txt)
-                            Text(ch.note).font(T.f(10)).foregroundColor(T.txt2)
+                            Text(ch.name).font(.system(size: 11, weight: .medium))
+                            Text(ch.note).font(.system(size: 9)).foregroundColor(.secondary)
                         }
-                        Text(ch.detail).font(T.mono(10)).foregroundColor(T.txt2).lineLimit(1)
+                        Text(ch.detail).font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary).lineLimit(1)
                     }
                     Spacer()
                     if let ok = ch.ok {
-                        pill(ok ? "通" : "断", ok ? T.ok : T.fail)
+                        statusDot(ok)
                     }
                 }
-                .padding(.vertical, 4)
-                if i < vm.channels.count - 1 { Divider().opacity(0.3) }
+                .padding(.vertical, 3)
+                if i < vm.channels.count - 1 {
+                    Divider().opacity(0.5)
+                }
             }
         }
         .card()
-        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 10)
-        .animation(.easeOut(duration: 0.4).delay(0.05), value: appeared)
+        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.3).delay(0.05), value: appeared)
     }
 
     // MARK: IP
 
     var ipCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("🌍").font(.system(size: 14))
-                Text("你的出口 IP").font(T.f(13, .bold)).foregroundColor(T.accent)
+                Label("出口 IP", systemImage: "location.circle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.primary)
                 Spacer()
                 refreshBtn { vm.fetchMyIP() }
             }
@@ -346,159 +332,151 @@ struct ContentView: View {
             else if let ip = vm.myIP {
                 ipLine(ip)
                 if editingExpectedIP || vm.expectedEgressIP.isEmpty {
-                    HStack(spacing: 6) {
-                        TextField("输入要校验的出口IP（可保存）", text: $expectedEgressDraft)
-                            .textFieldStyle(.roundedBorder).font(T.mono(12))
+                    HStack(spacing: 4) {
+                        TextField("校验出口IP", text: $expectedEgressDraft)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 11, design: .monospaced))
                             .onSubmit { saveExpectedIP() }
-                        Button(action: { saveExpectedIP() }) {
-                            Text("保存").font(T.f(12, .semibold)).foregroundColor(.white)
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(T.accent).cornerRadius(6)
-                        }.buttonStyle(.plain)
+                        Button("保存") { saveExpectedIP() }
+                            .buttonStyle(.borderedProminent).controlSize(.small)
                         if !vm.expectedEgressIP.isEmpty {
-                            Button(action: {
+                            Button("取消") {
                                 expectedEgressDraft = vm.expectedEgressIP
                                 editingExpectedIP = false
-                            }) {
-                                Text("取消").font(T.f(12, .semibold)).foregroundColor(T.txt2)
-                                    .padding(.horizontal, 10).padding(.vertical, 5)
-                                    .background(T.subtle).cornerRadius(6)
-                            }.buttonStyle(.plain)
+                            }.controlSize(.small)
                         }
                     }
                 } else {
-                    HStack(spacing: 6) {
-                        Text("校验目标IP").font(T.f(11, .semibold)).foregroundColor(T.txt)
-                        Text(vm.expectedEgressIP).font(T.mono(11)).foregroundColor(T.txt2)
+                    HStack(spacing: 4) {
+                        Text("目标").font(.system(size: 10, weight: .medium))
+                        Text(vm.expectedEgressIP)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
                         Spacer()
-                        Button(action: {
+                        Button("修改") {
                             expectedEgressDraft = vm.expectedEgressIP
                             editingExpectedIP = true
-                        }) {
-                            Text("修改").font(T.f(12, .semibold)).foregroundColor(T.accent)
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(T.accent.opacity(0.10)).cornerRadius(6)
-                        }.buttonStyle(.plain)
+                        }.controlSize(.mini)
                     }
                 }
-                Text("已保存的校验IP会自动预填到“查一个 IP”")
-                    .font(T.f(10)).foregroundColor(T.txt2)
                 egressIPCheck(currentIP: ip.ip, expectedInput: vm.expectedEgressIP)
             }
             else if vm.ipFailed {
-                Text("获取失败").font(T.f(12)).foregroundColor(T.fail)
+                Text("获取失败").font(.system(size: 11)).foregroundColor(.red)
             }
         }
         .card()
-        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 10)
-        .animation(.easeOut(duration: 0.4).delay(0.1), value: appeared)
+        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.3).delay(0.1), value: appeared)
     }
 
     // MARK: Health
 
     var healthCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("🏥").font(.system(size: 14))
-                Text("域名连通性").font(T.f(13, .bold)).foregroundColor(T.accent)
+                Label("域名连通性", systemImage: "heart.text.square")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.primary)
                 Spacer()
                 if vm.testing { ProgressView().controlSize(.small).scaleEffect(0.7) }
                 refreshBtn { vm.runTests() }.disabled(vm.testing)
             }
-            let cols = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
-            LazyVGrid(columns: cols, spacing: 4) {
+            let cols = [GridItem(.flexible(), spacing: 4), GridItem(.flexible(), spacing: 4)]
+            LazyVGrid(columns: cols, spacing: 3) {
                 ForEach(vm.sites) { s in
-                    HStack(spacing: 4) {
-                        stateIcon(s.state).frame(width: 12, height: 12)
+                    HStack(spacing: 3) {
+                        stateIcon(s.state).frame(width: 10, height: 10)
                         Text(shortDomain(s.domain))
-                            .font(T.mono(10)).foregroundColor(T.txt).lineLimit(1)
+                            .font(.system(size: 10, design: .monospaced))
+                            .lineLimit(1)
                         Spacer()
                         if case .ok(let ms) = s.state {
-                            Text("\(ms)ms").font(T.mono(9)).foregroundColor(T.ok.opacity(0.7))
+                            Text("\(ms)ms").font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.green)
                         } else if case .blocked = s.state {
-                            Text("受限").font(T.f(9, .medium)).foregroundColor(T.warn)
+                            Text("受限").font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.orange)
                         } else if case .fail(let r) = s.state {
-                            Text(r).font(T.f(9)).foregroundColor(T.fail)
+                            Text(r).font(.system(size: 9)).foregroundColor(.red)
                         }
                     }
-                    .padding(.vertical, 3).padding(.horizontal, 6)
-                    .background(stateBG(s.state)).cornerRadius(5)
+                    .padding(.vertical, 2).padding(.horizontal, 5)
+                    .background(stateBG(s.state)).cornerRadius(4)
                 }
             }
             if !vm.summary.isEmpty {
                 Text(vm.summary)
-                    .font(T.f(12, .semibold)).foregroundColor(summaryColor)
-                    .frame(maxWidth: .infinity).padding(8)
-                    .background(summaryColor.opacity(0.08)).cornerRadius(6)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(summaryColor)
+                    .frame(maxWidth: .infinity).padding(6)
+                    .background(summaryColor.opacity(0.1)).cornerRadius(5)
             }
         }
         .card()
-        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 10)
-        .animation(.easeOut(duration: 0.4).delay(0.15), value: appeared)
+        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.3).delay(0.15), value: appeared)
     }
 
-    // MARK: Lookup (折叠)
+    // MARK: Lookup
 
     var lookupSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Button(action: {
                 let next = !vm.showLookup
                 withAnimation(.easeInOut(duration: 0.2)) { vm.showLookup = next }
                 if next { vm.prefillLookupFromExpected() }
             }) {
                 HStack {
-                    Text("🔍").font(.system(size: 14))
-                    Text("查一个 IP").font(T.f(13, .bold)).foregroundColor(T.accent)
+                    Label("查一个 IP", systemImage: "magnifyingglass")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: vm.showLookup ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10)).foregroundColor(T.txt2)
+                        .font(.system(size: 9)).foregroundColor(.secondary)
                 }
             }.buttonStyle(.plain)
             if vm.showLookup {
-                HStack(spacing: 6) {
-                    TextField("输入要查询的IP", text: $vm.lookupInput)
-                        .textFieldStyle(.roundedBorder).font(T.mono(12))
+                HStack(spacing: 4) {
+                    TextField("IP 地址", text: $vm.lookupInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11, design: .monospaced))
                         .onSubmit { vm.lookup() }
-                    Button(action: { vm.lookup() }) {
-                        Text("查").font(T.f(12, .semibold)).foregroundColor(.white)
-                            .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(T.accent).cornerRadius(6)
-                    }.buttonStyle(.plain)
+                    Button("查") { vm.lookup() }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
                 }
                 if vm.lookingUp { loader("查询中…") }
                 else if let r = vm.lookupResult { ipLine(r) }
                 else if vm.lookupFailed {
-                    Text("查询失败").font(T.f(11)).foregroundColor(T.fail)
+                    Text("查询失败").font(.system(size: 11)).foregroundColor(.red)
                 }
             }
         }
         .card()
-        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 10)
-        .animation(.easeOut(duration: 0.4).delay(0.2), value: appeared)
+        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.3).delay(0.2), value: appeared)
     }
 
     var footer: some View {
-        Text("纯诊断工具 · 不注入 · 不驻留 · 杀掉零影响")
-            .font(T.f(10)).foregroundColor(T.txt2)
-            .frame(maxWidth: .infinity).padding(.vertical, 6)
-            .background(T.bg.opacity(0.95))
+        Text("常驻菜单栏 · 纯诊断 · 不注入 · 不驻留进程")
+            .font(.system(size: 9)).foregroundColor(.secondary)
+            .frame(maxWidth: .infinity).padding(.vertical, 5)
     }
 
     // MARK: Helpers
 
     func ipLine(_ g: IPGeo) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Text(g.ip ?? "—")
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                .foregroundColor(T.txt)
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
             if let city = g.city {
                 let parts = [city, g.region, g.country_name].compactMap { $0 }
-                Text("📍 " + parts.joined(separator: ", "))
-                    .font(T.f(11)).foregroundColor(T.txt2).lineLimit(1)
+                Text(parts.joined(separator: ", "))
+                    .font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer()
             if let org = g.org {
-                Text(org).font(T.f(10)).foregroundColor(T.txt2.opacity(0.7)).lineLimit(1)
+                Text(org).font(.system(size: 9)).foregroundColor(.secondary).lineLimit(1)
             }
         }
     }
@@ -509,20 +487,15 @@ struct ContentView: View {
         let actual = (currentIP ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let hasExpected = !expected.isEmpty
         let matched = hasExpected && !actual.isEmpty && actual == expected
-        HStack(spacing: 6) {
-            Text("目标出口IP")
-                .font(T.f(11, .semibold))
-                .foregroundColor(T.txt)
-            Text(hasExpected ? expected : "未设置")
-                .font(T.mono(11))
-                .foregroundColor(T.txt2)
-            Spacer()
-            if !hasExpected {
-                pill("待设置", T.warn)
-            } else if actual.isEmpty {
-                pill("未知", T.warn)
-            } else {
-                pill(matched ? "匹配" : "不匹配", matched ? T.ok : T.fail)
+        if hasExpected {
+            HStack(spacing: 4) {
+                Image(systemName: matched ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundColor(matched ? .green : .red)
+                    .font(.system(size: 11))
+                Text(matched ? "出口IP匹配" : "出口IP不匹配")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(matched ? .green : .red)
+                Spacer()
             }
         }
     }
@@ -534,64 +507,49 @@ struct ContentView: View {
     @ViewBuilder
     func stateIcon(_ s: Chk) -> some View {
         switch s {
-        case .idle:    Circle().fill(T.subtle).frame(width: 8, height: 8)
-        case .testing: ProgressView().controlSize(.small).scaleEffect(0.5)
-        case .ok:      Image(systemName: "checkmark.circle.fill").foregroundColor(T.ok).font(.system(size: 11))
-        case .fail:    Image(systemName: "xmark.circle.fill").foregroundColor(T.fail).font(.system(size: 11))
-        case .blocked: Image(systemName: "exclamationmark.triangle.fill").foregroundColor(T.warn).font(.system(size: 11))
+        case .idle:    Circle().fill(Color.secondary.opacity(0.3)).frame(width: 7, height: 7)
+        case .testing: ProgressView().controlSize(.small).scaleEffect(0.4)
+        case .ok:      Image(systemName: "checkmark.circle.fill").foregroundColor(.green).font(.system(size: 10))
+        case .fail:    Image(systemName: "xmark.circle.fill").foregroundColor(.red).font(.system(size: 10))
+        case .blocked: Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange).font(.system(size: 10))
         }
     }
 
     func stateBG(_ s: Chk) -> Color {
         switch s {
-        case .ok: return T.ok.opacity(0.06)
-        case .fail: return T.fail.opacity(0.06)
-        case .blocked: return T.warn.opacity(0.06)
+        case .ok: return .green.opacity(0.08)
+        case .fail: return .red.opacity(0.08)
+        case .blocked: return .orange.opacity(0.08)
         default: return .clear
         }
     }
 
-    func pill(_ text: String, _ color: Color) -> some View {
-        Text(text).font(T.f(11, .bold)).foregroundColor(.white)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .frame(minWidth: 56)
-            .background(RoundedRectangle(cornerRadius: 6).fill(color))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
-            )
-            .shadow(color: color.opacity(0.35), radius: 2, y: 1)
+    func statusDot(_ ok: Bool) -> some View {
+        Circle()
+            .fill(ok ? Color.green : Color.red)
+            .frame(width: 8, height: 8)
+            .shadow(color: (ok ? Color.green : Color.red).opacity(0.5), radius: 3)
     }
 
     var summaryColor: Color {
-        vm.summary.contains("🎉") ? T.ok :
-        vm.summary.contains("🔌") ? T.fail : T.warn
+        if vm.summary.contains("畅通") { return .green }
+        if vm.summary.contains("覆没") { return .red }
+        return .orange
     }
 
     func refreshBtn(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.clockwise")
-                Text("刷新")
-            }
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(T.accent)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(T.accent.opacity(0.16))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(T.accent.opacity(0.55), lineWidth: 1)
-            )
-        }.buttonStyle(.plain)
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .buttonStyle(.plain)
     }
 
     func loader(_ msg: String) -> some View {
-        HStack(spacing: 6) {
-            ProgressView().controlSize(.small).scaleEffect(0.7)
-            Text(msg).font(T.f(11)).foregroundColor(T.txt2)
+        HStack(spacing: 4) {
+            ProgressView().controlSize(.small).scaleEffect(0.6)
+            Text(msg).font(.system(size: 10)).foregroundColor(.secondary)
         }
     }
 
@@ -602,76 +560,92 @@ struct ContentView: View {
     }
 }
 
-// MARK: - AppDelegate + close confirmation
+// MARK: - Card modifier
 
-class AppDel: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    var w: NSWindow!
-
-    // Default launch size is calculated from current visible blocks to avoid clipped first render.
-    private func calculatedDefaultContentSize() -> NSSize {
-        let header: CGFloat = 40
-        let channelCard: CGFloat = 124
-        let ipCard: CGFloat = 176
-        let healthCard: CGFloat = 228
-        let lookupCardCollapsed: CGFloat = 64
-        let interCardSpacing: CGFloat = 14 * 3
-        let verticalPadding: CGFloat = 44
-        let footer: CGFloat = 24
-
-        let height = header
-            + channelCard
-            + ipCard
-            + healthCard
-            + lookupCardCollapsed
-            + interCardSpacing
-            + verticalPadding
-            + footer
-
-        return NSSize(width: 520, height: ceil(height))
+struct CardMod: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+            )
     }
+}
+extension View { func card() -> some View { modifier(CardMod()) } }
+
+// MARK: - AppDelegate (Menu Bar)
+
+class AppDel: NSObject, NSApplicationDelegate {
+    var statusItem: NSStatusItem!
+    var popover: NSPopover!
+    var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ n: Notification) {
-        let defaultSize = calculatedDefaultContentSize()
-        w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: defaultSize.width, height: defaultSize.height),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered, defer: false
-        )
-        w.center()
-        w.title = "Proxy Pulse"
-        w.titlebarAppearsTransparent = true
-        w.backgroundColor = NSColor(red: 0.98, green: 0.96, blue: 0.93, alpha: 1)
-        w.contentView = NSHostingView(rootView: ContentView())
-        w.makeKeyAndOrderFront(nil)
-        w.isReleasedWhenClosed = false
-        w.delegate = self
-        w.minSize = NSSize(width: 460, height: 700)
+        // Status bar item
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let btn = statusItem.button {
+            btn.image = NSImage(systemSymbolName: "antenna.radiowaves.left.and.right",
+                                accessibilityDescription: "Proxy Pulse")
+            btn.image?.size = NSSize(width: 16, height: 16)
+            btn.action = #selector(togglePopover)
+            btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+
+        // Popover
+        popover = NSPopover()
+        popover.contentSize = NSSize(width: 370, height: 520)
+        popover.behavior = .transient
+        popover.animates = true
+        popover.contentViewController = NSHostingController(rootView: ContentView())
+
+        // Close popover on outside click
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            if let p = self?.popover, p.isShown { p.performClose(nil) }
+        }
     }
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        let a = NSAlert()
-        a.messageText = "关闭 Proxy Pulse?"
-        a.informativeText = "放心关: 这只是诊断镜子,不注入任何东西。\n关闭后代理配置不受影响。\n(代理由 LaunchAgent + 小火箭管控)"
-        a.alertStyle = .informational
-        a.addButton(withTitle: "关闭")
-        a.addButton(withTitle: "留着")
-        return a.runModal() == .alertFirstButtonReturn
+    @objc func togglePopover(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp {
+            showMenu()
+            return
+        }
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            if let btn = statusItem.button {
+                popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { true }
+    func showMenu() {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "关于 Proxy Pulse",
+                     action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+                     keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "退出 Proxy Pulse",
+                     action: #selector(NSApplication.terminate(_:)),
+                     keyEquivalent: "q")
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        // Reset menu so left click works normally next time
+        DispatchQueue.main.async { [weak self] in
+            self?.statusItem.menu = nil
+        }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }
 }
+
+// MARK: - Main
 
 let app = NSApplication.shared
 let del = AppDel()
 app.delegate = del
-let menu = NSMenu(); let ai = NSMenuItem(); menu.addItem(ai)
-let sub = NSMenu()
-sub.addItem(withTitle: "关于 Proxy Pulse",
-            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-sub.addItem(.separator())
-sub.addItem(withTitle: "退出 Proxy Pulse",
-            action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-ai.submenu = sub; app.mainMenu = menu
-app.setActivationPolicy(.regular)
-app.activate(ignoringOtherApps: true)
+app.setActivationPolicy(.accessory)  // No dock icon
 app.run()
