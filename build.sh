@@ -15,11 +15,11 @@ echo ""
 # ── Detect architecture ─────────────────────────────────────────────────────
 ARCH=$(uname -m)
 if [[ "$ARCH" == "arm64" ]]; then
-    TARGET="arm64-apple-macos13"
+    TARGET="arm64-apple-macos26"
 elif [[ "$ARCH" == "x86_64" ]]; then
-    TARGET="x86_64-apple-macos13"
+    TARGET="x86_64-apple-macos26"
 else
-    TARGET="arm64-apple-macos13"
+    TARGET="arm64-apple-macos26"
 fi
 
 # ── Compile ─────────────────────────────────────────────────────────────────

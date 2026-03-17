@@ -303,7 +303,7 @@ struct ContentView: View {
                     }
                     Spacer()
                     if let ok = ch.ok {
-                        statusDot(ok)
+                        statusPill(ok)
                     }
                 }
                 .padding(.vertical, 3)
@@ -524,11 +524,13 @@ struct ContentView: View {
         }
     }
 
-    func statusDot(_ ok: Bool) -> some View {
-        Circle()
-            .fill(ok ? Color.green : Color.red)
-            .frame(width: 8, height: 8)
-            .shadow(color: (ok ? Color.green : Color.red).opacity(0.5), radius: 3)
+    func statusPill(_ ok: Bool) -> some View {
+        Text(ok ? "通" : "断")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background((ok ? Color.green : Color.red), in: RoundedRectangle(cornerRadius: 5))
+            .shadow(color: (ok ? Color.green : Color.red).opacity(0.4), radius: 2, y: 1)
     }
 
     var summaryColor: Color {
@@ -539,9 +541,14 @@ struct ContentView: View {
 
     func refreshBtn(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.secondary)
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.clockwise")
+                Text("刷新")
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.blue)
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
         }
         .buttonStyle(.plain)
     }
@@ -566,11 +573,7 @@ struct CardMod: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
-            )
+            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
     }
 }
 extension View { func card() -> some View { modifier(CardMod()) } }
@@ -586,9 +589,11 @@ class AppDel: NSObject, NSApplicationDelegate {
         // Status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let btn = statusItem.button {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
             btn.image = NSImage(systemSymbolName: "network",
-                                accessibilityDescription: "Proxy Pulse")
-            btn.image?.size = NSSize(width: 16, height: 16)
+                                accessibilityDescription: "Proxy Pulse")?
+                .withSymbolConfiguration(config)
+            btn.image?.isTemplate = true
             btn.action = #selector(togglePopover)
             btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
