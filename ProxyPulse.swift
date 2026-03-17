@@ -60,7 +60,7 @@ struct ChanStatus: Identifiable {
 class VM: ObservableObject {
     @Published var myIP: IPGeo?
     @Published var lookupResult: IPGeo?
-    @Published var lookupInput = "64.118.153.133"
+    @Published var lookupInput = ""
     @Published var sites: [Site] = []
     @Published var channels: [ChanStatus] = []
     @Published var fetchingIP = false
@@ -77,7 +77,6 @@ class VM: ObservableObject {
         ("statsig.anthropic.com", "Claude"), ("sentry.io", "Claude"),
         ("platform.claude.com", "Claude"), ("code.claude.com", "Claude"),
     ]
-    static let requiredEgressIP = "64.118.153.133"
 
     init() {
         sites = Self.domains.map { Site(domain: $0.0, tag: $0.1) }
@@ -319,7 +318,7 @@ struct ContentView: View {
             if vm.fetchingIP { loader("正在戳…") }
             else if let ip = vm.myIP {
                 ipLine(ip)
-                egressIPCheck(ip.ip)
+                egressIPCheck(currentIP: ip.ip, expectedInput: vm.lookupInput)
             }
             else if vm.ipFailed {
                 Text("获取失败").font(T.f(12)).foregroundColor(T.fail)
@@ -388,7 +387,7 @@ struct ContentView: View {
             }.buttonStyle(.plain)
             if vm.showLookup {
                 HStack(spacing: 6) {
-                    TextField("IP", text: $vm.lookupInput)
+                    TextField("目标出口IP (用于查询+校验)", text: $vm.lookupInput)
                         .textFieldStyle(.plain).font(T.mono(12)).padding(6)
                         .background(T.subtle.opacity(0.5)).cornerRadius(6)
                         .onSubmit { vm.lookup() }
@@ -398,6 +397,7 @@ struct ContentView: View {
                             .background(T.accent).cornerRadius(6)
                     }.buttonStyle(.plain)
                 }
+                egressIPCheck(currentIP: vm.myIP?.ip, expectedInput: vm.lookupInput)
                 if vm.lookingUp { loader("查询中…") }
                 else if let r = vm.lookupResult { ipLine(r) }
                 else if vm.lookupFailed {
@@ -437,18 +437,26 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    func egressIPCheck(_ currentIP: String?) -> some View {
-        let expected = VM.requiredEgressIP
-        let matched = (currentIP ?? "") == expected
+    func egressIPCheck(currentIP: String?, expectedInput: String) -> some View {
+        let expected = expectedInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let actual = (currentIP ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasExpected = !expected.isEmpty
+        let matched = hasExpected && !actual.isEmpty && actual == expected
         HStack(spacing: 6) {
             Text("目标出口IP")
                 .font(T.f(11, .semibold))
                 .foregroundColor(T.txt)
-            Text(expected)
+            Text(hasExpected ? expected : "未设置")
                 .font(T.mono(11))
                 .foregroundColor(T.txt2)
             Spacer()
-            pill(matched ? "匹配" : "不匹配", matched ? T.ok : T.fail)
+            if !hasExpected {
+                pill("待设置", T.warn)
+            } else if actual.isEmpty {
+                pill("未知", T.warn)
+            } else {
+                pill(matched ? "匹配" : "不匹配", matched ? T.ok : T.fail)
+            }
         }
     }
 
