@@ -252,7 +252,7 @@ struct ContentView: View {
 
             footer
         }
-        .frame(width: 460, height: 600)
+        .frame(width: 500, height: 720)
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) { appeared = true }
             expectedEgressDraft = vm.expectedEgressIP
@@ -637,9 +637,9 @@ class AppDel: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // Status bar item
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: 20)
         if let btn = statusItem.button {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
             btn.image = NSImage(systemSymbolName: "network",
                                 accessibilityDescription: "Proxy Pulse")?
                 .withSymbolConfiguration(config)
@@ -650,7 +650,7 @@ class AppDel: NSObject, NSApplicationDelegate {
 
         // Popover
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 460, height: 600)
+        popover.contentSize = NSSize(width: 500, height: 720)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: ContentView())
