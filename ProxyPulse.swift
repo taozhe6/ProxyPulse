@@ -22,7 +22,7 @@ let probeSess: URLSession = {
 
 struct IPGeo: Codable {
     let ip: String?; let city: String?; let region: String?
-    let country_name: String?; let org: String?
+    let country_name: String?; let org: String?; let timezone: String?
 }
 
 enum Chk: Equatable { case idle, testing, ok(Int), fail(String), blocked }
@@ -198,7 +198,7 @@ class VM: ObservableObject {
            let (d, _) = try? await URLSession.shared.data(from: url2),
            let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
            let s = j["ip"] as? String {
-            return IPGeo(ip: s, city: nil, region: nil, country_name: nil, org: nil)
+            return IPGeo(ip: s, city: nil, region: nil, country_name: nil, org: nil, timezone: nil)
         }
         return nil
     }
@@ -244,6 +244,7 @@ struct ContentView: View {
                     channelCard
                     ipCard
                     healthCard
+                    timezoneCard
                     lookupSection
                 }
                 .padding(.horizontal, 14).padding(.bottom, 10)
@@ -251,8 +252,7 @@ struct ContentView: View {
 
             footer
         }
-        .background(.regularMaterial)
-        .frame(width: 370, height: 520)
+        .frame(width: 460, height: 600)
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) { appeared = true }
             expectedEgressDraft = vm.expectedEgressIP
@@ -267,11 +267,11 @@ struct ContentView: View {
     var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "network")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.accentColor)
-            Text("Proxy Pulse").font(.system(size: 15, weight: .bold))
+            Text("Proxy Pulse").font(.system(size: 17, weight: .bold))
             Spacer()
-            Text("只读诊断").font(.system(size: 10)).foregroundColor(.secondary)
+            Text("只读诊断").font(.system(size: 12)).foregroundColor(.secondary)
         }
         .padding(.horizontal, 14)
     }
@@ -282,7 +282,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Label("三通道代理状态", systemImage: "network")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
                 refreshBtn { vm.detectChannels() }
@@ -290,15 +290,15 @@ struct ContentView: View {
             ForEach(Array(vm.channels.enumerated()), id: \.element.id) { i, ch in
                 HStack(spacing: 6) {
                     Image(systemName: ch.icon)
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(.secondary)
-                        .frame(width: 16)
-                    VStack(alignment: .leading, spacing: 1) {
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 4) {
-                            Text(ch.name).font(.system(size: 11, weight: .medium))
-                            Text(ch.note).font(.system(size: 9)).foregroundColor(.secondary)
+                            Text(ch.name).font(.system(size: 13, weight: .medium))
+                            Text(ch.note).font(.system(size: 11)).foregroundColor(.secondary)
                         }
-                        Text(ch.detail).font(.system(size: 10, design: .monospaced))
+                        Text(ch.detail).font(.system(size: 12, design: .monospaced))
                             .foregroundColor(.secondary).lineLimit(1)
                     }
                     Spacer()
@@ -323,7 +323,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Label("出口 IP", systemImage: "location.circle")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
                 refreshBtn { vm.fetchMyIP() }
@@ -335,7 +335,7 @@ struct ContentView: View {
                     HStack(spacing: 4) {
                         TextField("校验出口IP", text: $expectedEgressDraft)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: 13, design: .monospaced))
                             .onSubmit { saveExpectedIP() }
                         Button("保存") { saveExpectedIP() }
                             .buttonStyle(.borderedProminent).controlSize(.small)
@@ -348,9 +348,9 @@ struct ContentView: View {
                     }
                 } else {
                     HStack(spacing: 4) {
-                        Text("目标").font(.system(size: 10, weight: .medium))
+                        Text("目标").font(.system(size: 12, weight: .medium))
                         Text(vm.expectedEgressIP)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(.secondary)
                         Spacer()
                         Button("修改") {
@@ -362,7 +362,7 @@ struct ContentView: View {
                 egressIPCheck(currentIP: ip.ip, expectedInput: vm.expectedEgressIP)
             }
             else if vm.ipFailed {
-                Text("获取失败").font(.system(size: 11)).foregroundColor(.red)
+                Text("获取失败").font(.system(size: 13)).foregroundColor(.red)
             }
         }
         .card()
@@ -376,7 +376,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Label("域名连通性", systemImage: "heart.text.square")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
                 if vm.testing { ProgressView().controlSize(.small).scaleEffect(0.7) }
@@ -385,29 +385,29 @@ struct ContentView: View {
             let cols = [GridItem(.flexible(), spacing: 4), GridItem(.flexible(), spacing: 4)]
             LazyVGrid(columns: cols, spacing: 3) {
                 ForEach(vm.sites) { s in
-                    HStack(spacing: 3) {
-                        stateIcon(s.state).frame(width: 10, height: 10)
+                    HStack(spacing: 4) {
+                        stateIcon(s.state).frame(width: 12, height: 12)
                         Text(shortDomain(s.domain))
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(size: 12, design: .monospaced))
                             .lineLimit(1)
                         Spacer()
                         if case .ok(let ms) = s.state {
-                            Text("\(ms)ms").font(.system(size: 9, design: .monospaced))
+                            Text("\(ms)ms").font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(.green)
                         } else if case .blocked = s.state {
-                            Text("受限").font(.system(size: 9, weight: .medium))
+                            Text("受限").font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.orange)
                         } else if case .fail(let r) = s.state {
-                            Text(r).font(.system(size: 9)).foregroundColor(.red)
+                            Text(r).font(.system(size: 11)).foregroundColor(.red)
                         }
                     }
-                    .padding(.vertical, 2).padding(.horizontal, 5)
+                    .padding(.vertical, 3).padding(.horizontal, 6)
                     .background(stateBG(s.state)).cornerRadius(4)
                 }
             }
             if !vm.summary.isEmpty {
                 Text(vm.summary)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(summaryColor)
                     .frame(maxWidth: .infinity).padding(6)
                     .background(summaryColor.opacity(0.1)).cornerRadius(5)
@@ -416,6 +416,34 @@ struct ContentView: View {
         .card()
         .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 8)
         .animation(.easeOut(duration: 0.3).delay(0.15), value: appeared)
+    }
+
+    // MARK: Timezone
+
+    var timezoneCard: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock").font(.system(size: 13)).foregroundColor(.secondary)
+            Text("时区一致性").font(.system(size: 13, weight: .medium))
+            Spacer()
+            if let ipTZ = vm.myIP?.timezone {
+                let sysTZ = TimeZone.current.identifier
+                let match = ipTZ == sysTZ
+                HStack(spacing: 4) {
+                    Text(match ? "一致" : "\(sysTZ) ≠ \(ipTZ)")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(match ? .green : .orange)
+                    Image(systemName: match ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(match ? .green : .orange)
+                        .font(.system(size: 12))
+                }
+            } else {
+                Text(vm.fetchingIP ? "检测中…" : "待检测")
+                    .font(.system(size: 12)).foregroundColor(.secondary)
+            }
+        }
+        .card()
+        .opacity(appeared ? 1 : 0).offset(y: appeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.3).delay(0.18), value: appeared)
     }
 
     // MARK: Lookup
@@ -429,18 +457,18 @@ struct ContentView: View {
             }) {
                 HStack {
                     Label("查一个 IP", systemImage: "magnifyingglass")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: vm.showLookup ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9)).foregroundColor(.secondary)
+                        .font(.system(size: 11)).foregroundColor(.secondary)
                 }
             }.buttonStyle(.plain)
             if vm.showLookup {
                 HStack(spacing: 4) {
                     TextField("IP 地址", text: $vm.lookupInput)
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: 13, design: .monospaced))
                         .onSubmit { vm.lookup() }
                     Button("查") { vm.lookup() }
                         .buttonStyle(.borderedProminent).controlSize(.small)
@@ -448,7 +476,7 @@ struct ContentView: View {
                 if vm.lookingUp { loader("查询中…") }
                 else if let r = vm.lookupResult { ipLine(r) }
                 else if vm.lookupFailed {
-                    Text("查询失败").font(.system(size: 11)).foregroundColor(.red)
+                    Text("查询失败").font(.system(size: 13)).foregroundColor(.red)
                 }
             }
         }
@@ -458,25 +486,44 @@ struct ContentView: View {
     }
 
     var footer: some View {
-        Text("常驻菜单栏 · 纯诊断 · 不注入 · 不驻留进程")
-            .font(.system(size: 9)).foregroundColor(.secondary)
-            .frame(maxWidth: .infinity).padding(.vertical, 5)
+        VStack(spacing: 4) {
+            HStack(spacing: 12) {
+                Button("PixelScan") { openInSafari("https://pixelscan.net/") }
+                Button("IP2Location") { openInSafari("https://www.ip2location.com/") }
+            }
+            .font(.system(size: 12, weight: .medium))
+            .buttonStyle(.plain)
+            .foregroundColor(.blue)
+            Text("常驻菜单栏 · 纯诊断 · 不注入")
+                .font(.system(size: 11)).foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 5)
+    }
+
+    func openInSafari(_ urlString: String) {
+        guard let url = URL(string: urlString),
+              let safariURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari")
+        else { return }
+        let config = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: config)
     }
 
     // MARK: Helpers
 
     func ipLine(_ g: IPGeo) -> some View {
-        HStack(spacing: 6) {
-            Text(g.ip ?? "—")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-            if let city = g.city {
-                let parts = [city, g.region, g.country_name].compactMap { $0 }
-                Text(parts.joined(separator: ", "))
-                    .font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(g.ip ?? "—")
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                if let city = g.city {
+                    let parts = [city, g.region, g.country_name].compactMap { $0 }
+                    Text(parts.joined(separator: ", "))
+                        .font(.system(size: 12)).foregroundColor(.secondary)
+                }
+                Spacer()
             }
-            Spacer()
             if let org = g.org {
-                Text(org).font(.system(size: 9)).foregroundColor(.secondary).lineLimit(1)
+                Text(org).font(.system(size: 11)).foregroundColor(.secondary)
             }
         }
     }
@@ -491,9 +538,9 @@ struct ContentView: View {
             HStack(spacing: 4) {
                 Image(systemName: matched ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .foregroundColor(matched ? .green : .red)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                 Text(matched ? "出口IP匹配" : "出口IP不匹配")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(matched ? .green : .red)
                 Spacer()
             }
@@ -501,17 +548,20 @@ struct ContentView: View {
     }
 
     func shortDomain(_ d: String) -> String {
-        d.replacingOccurrences(of: ".anthropic.com", with: "…a.c")
+        d.replacingOccurrences(of: "statsig.anthropic.com", with: "statsig…")
+         .replacingOccurrences(of: "api.anthropic.com", with: "api.anthro…")
+         .replacingOccurrences(of: "platform.claude.com", with: "platform.cl…")
+         .replacingOccurrences(of: "code.claude.com", with: "code.claude")
     }
 
     @ViewBuilder
     func stateIcon(_ s: Chk) -> some View {
         switch s {
-        case .idle:    Circle().fill(Color.secondary.opacity(0.3)).frame(width: 7, height: 7)
-        case .testing: ProgressView().controlSize(.small).scaleEffect(0.4)
-        case .ok:      Image(systemName: "checkmark.circle.fill").foregroundColor(.green).font(.system(size: 10))
-        case .fail:    Image(systemName: "xmark.circle.fill").foregroundColor(.red).font(.system(size: 10))
-        case .blocked: Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange).font(.system(size: 10))
+        case .idle:    Circle().fill(Color.secondary.opacity(0.3)).frame(width: 8, height: 8)
+        case .testing: ProgressView().controlSize(.small).scaleEffect(0.5)
+        case .ok:      Image(systemName: "checkmark.circle.fill").foregroundColor(.green).font(.system(size: 12))
+        case .fail:    Image(systemName: "xmark.circle.fill").foregroundColor(.red).font(.system(size: 12))
+        case .blocked: Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange).font(.system(size: 12))
         }
     }
 
@@ -526,7 +576,7 @@ struct ContentView: View {
 
     func statusPill(_ ok: Bool) -> some View {
         Text(ok ? "通" : "断")
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: 12, weight: .bold))
             .foregroundColor(.white)
             .padding(.horizontal, 8).padding(.vertical, 3)
             .background((ok ? Color.green : Color.red), in: RoundedRectangle(cornerRadius: 5))
@@ -545,18 +595,18 @@ struct ContentView: View {
                 Image(systemName: "arrow.clockwise")
                 Text("刷新")
             }
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .foregroundColor(.blue)
-            .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
     }
 
     func loader(_ msg: String) -> some View {
         HStack(spacing: 4) {
-            ProgressView().controlSize(.small).scaleEffect(0.6)
-            Text(msg).font(.system(size: 10)).foregroundColor(.secondary)
+            ProgressView().controlSize(.small).scaleEffect(0.7)
+            Text(msg).font(.system(size: 12)).foregroundColor(.secondary)
         }
     }
 
@@ -573,7 +623,7 @@ struct CardMod: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+            .background(Color.primary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 extension View { func card() -> some View { modifier(CardMod()) } }
@@ -600,7 +650,7 @@ class AppDel: NSObject, NSApplicationDelegate {
 
         // Popover
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 370, height: 520)
+        popover.contentSize = NSSize(width: 460, height: 600)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: ContentView())
