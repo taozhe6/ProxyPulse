@@ -158,17 +158,22 @@ class VM: ObservableObject {
         sites = Self.domains.map { Site(domain: $0.0, tag: $0.1) }
         detectChannels()
         Task {
-            for i in sites.indices {
-                sites[i].state = .testing
-                sites[i].state = await probe(sites[i].domain)
-                try? await Task.sleep(nanoseconds: 60_000_000)
+            await withTaskGroup(of: (Int, Chk).self) { group in
+                for i in sites.indices {
+                    sites[i].state = .testing
+                    let domain = sites[i].domain
+                    group.addTask { (i, await self.probe(domain)) }
+                }
+                for await (i, result) in group {
+                    sites[i].state = result
+                }
             }
             let okN = sites.filter { if case .ok = $0.state { return true }; return false }.count
             let claudeAll = sites.filter { $0.tag == "Claude" }
             let claudeOK = claudeAll.allSatisfy { if case .ok = $0.state { return true }; return false }
             let claudeFail = claudeAll.filter { if case .ok = $0.state { return false }; return true }.count
 
-            if okN == sites.count      { summary = "全部畅通! 放心打开 Claude" }
+            if okN == sites.count      { summary = "全部畅通" }
             else if claudeOK           { summary = "Claude 可用, 部分基准站不通" }
             else if claudeFail > 0     { summary = "Claude 有 \(claudeFail) 个域名不通" }
             else                       { summary = "全军覆没 — 检查网络和代理" }
@@ -406,11 +411,38 @@ struct ContentView: View {
                 }
             }
             if !vm.summary.isEmpty {
-                Text(vm.summary)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(summaryColor)
-                    .frame(maxWidth: .infinity).padding(6)
-                    .background(summaryColor.opacity(0.1)).cornerRadius(5)
+                if vm.overallOK == true {
+                    let claude = Color(red: 0.85, green: 0.45, blue: 0.15)
+                    HStack(spacing: 8) {
+                        Button(action: { openInSafari("https://claude.ai/new") }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up.right.square")
+                                Text("打开 Claude")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(claude.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        Button(action: { openInSafari("https://claude.ai/settings/usage") }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chart.bar")
+                                Text("Usage")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(claude.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(claude)
+                    .buttonStyle(.plain)
+                } else {
+                    Text(vm.summary)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(summaryColor)
+                        .frame(maxWidth: .infinity).padding(6)
+                        .background(summaryColor.opacity(0.1)).cornerRadius(5)
+                }
             }
         }
         .card()
@@ -487,19 +519,6 @@ struct ContentView: View {
 
     var footer: some View {
         VStack(spacing: 4) {
-            if vm.overallOK == true {
-                Button(action: { openInSafari("https://claude.ai/new") }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up.right.square")
-                        Text("打开 Claude")
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(red: 0.85, green: 0.45, blue: 0.15))
-                    .padding(.horizontal, 14).padding(.vertical, 6)
-                    .background(Color(red: 0.85, green: 0.45, blue: 0.15).opacity(0.15), in: RoundedRectangle(cornerRadius: 7))
-                }
-                .buttonStyle(.plain)
-            }
             HStack(spacing: 12) {
                 Button("PixelScan") { openInSafari("https://pixelscan.net/") }
                 Button("IP2Location") { openInSafari("https://www.ip2location.com/") }
@@ -549,13 +568,13 @@ struct ContentView: View {
         let matched = hasExpected && !actual.isEmpty && actual == expected
         if hasExpected {
             HStack(spacing: 4) {
-                Image(systemName: matched ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundColor(matched ? .green : .red)
-                    .font(.system(size: 13))
+                Spacer()
                 Text(matched ? "出口IP匹配" : "出口IP不匹配")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(matched ? .green : .red)
-                Spacer()
+                Image(systemName: matched ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundColor(matched ? .green : .red)
+                    .font(.system(size: 13))
             }
         }
     }
