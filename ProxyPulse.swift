@@ -487,6 +487,19 @@ struct ContentView: View {
 
     var footer: some View {
         VStack(spacing: 4) {
+            if vm.overallOK == true {
+                Button(action: { openInSafari("https://claude.ai/new") }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right.square")
+                        Text("打开 Claude")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color(red: 0.85, green: 0.45, blue: 0.15))
+                    .padding(.horizontal, 14).padding(.vertical, 6)
+                    .background(Color(red: 0.85, green: 0.45, blue: 0.15).opacity(0.15), in: RoundedRectangle(cornerRadius: 7))
+                }
+                .buttonStyle(.plain)
+            }
             HStack(spacing: 12) {
                 Button("PixelScan") { openInSafari("https://pixelscan.net/") }
                 Button("IP2Location") { openInSafari("https://www.ip2location.com/") }
@@ -679,10 +692,6 @@ class AppDel: NSObject, NSApplicationDelegate {
 
     func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "关于 Proxy Pulse",
-                     action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
-                     keyEquivalent: "")
-        menu.addItem(.separator())
         menu.addItem(withTitle: "退出 Proxy Pulse",
                      action: #selector(NSApplication.terminate(_:)),
                      keyEquivalent: "q")
