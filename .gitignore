@@ -1,6 +1,7 @@
 # Build outputs
 Proxy Pulse.app/
 ProxyPulse
+dist/
 
 # macOS
 .DS_Store

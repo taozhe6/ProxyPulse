@@ -252,6 +252,8 @@ extension View { func card() -> some View { modifier(CardMod()) } }
 struct ContentView: View {
     @StateObject private var vm = VM()
     @State private var appeared = false
+    @State private var editingExpectedIP = false
+    @State private var expectedEgressDraft = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -279,6 +281,8 @@ struct ContentView: View {
         .frame(minWidth: 420, idealWidth: 440, minHeight: 560, idealHeight: 620)
         .onAppear {
             withAnimation(.easeOut(duration: 0.5)) { appeared = true }
+            expectedEgressDraft = vm.expectedEgressIP
+            editingExpectedIP = vm.expectedEgressIP.isEmpty
             vm.boot()
         }
     }
@@ -341,15 +345,41 @@ struct ContentView: View {
             if vm.fetchingIP { loader("正在戳…") }
             else if let ip = vm.myIP {
                 ipLine(ip)
-                HStack(spacing: 6) {
-                    TextField("输入要校验的出口IP（可保存）", text: $vm.expectedEgressIP)
-                        .textFieldStyle(.roundedBorder).font(T.mono(12))
-                        .onSubmit { vm.setExpectedEgressIP(vm.expectedEgressIP) }
-                    Button(action: { vm.setExpectedEgressIP(vm.expectedEgressIP) }) {
-                        Text("保存").font(T.f(12, .semibold)).foregroundColor(.white)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(T.accent).cornerRadius(6)
-                    }.buttonStyle(.plain)
+                if editingExpectedIP || vm.expectedEgressIP.isEmpty {
+                    HStack(spacing: 6) {
+                        TextField("输入要校验的出口IP（可保存）", text: $expectedEgressDraft)
+                            .textFieldStyle(.roundedBorder).font(T.mono(12))
+                            .onSubmit { saveExpectedIP() }
+                        Button(action: { saveExpectedIP() }) {
+                            Text("保存").font(T.f(12, .semibold)).foregroundColor(.white)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(T.accent).cornerRadius(6)
+                        }.buttonStyle(.plain)
+                        if !vm.expectedEgressIP.isEmpty {
+                            Button(action: {
+                                expectedEgressDraft = vm.expectedEgressIP
+                                editingExpectedIP = false
+                            }) {
+                                Text("取消").font(T.f(12, .semibold)).foregroundColor(T.txt2)
+                                    .padding(.horizontal, 10).padding(.vertical, 5)
+                                    .background(T.subtle).cornerRadius(6)
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Text("校验目标IP").font(T.f(11, .semibold)).foregroundColor(T.txt)
+                        Text(vm.expectedEgressIP).font(T.mono(11)).foregroundColor(T.txt2)
+                        Spacer()
+                        Button(action: {
+                            expectedEgressDraft = vm.expectedEgressIP
+                            editingExpectedIP = true
+                        }) {
+                            Text("修改").font(T.f(12, .semibold)).foregroundColor(T.accent)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(T.accent.opacity(0.10)).cornerRadius(6)
+                        }.buttonStyle(.plain)
+                    }
                 }
                 Text("已保存的校验IP会自动预填到“查一个 IP”")
                     .font(T.f(10)).foregroundColor(T.txt2)
@@ -546,6 +576,12 @@ struct ContentView: View {
             ProgressView().controlSize(.small).scaleEffect(0.7)
             Text(msg).font(T.f(11)).foregroundColor(T.txt2)
         }
+    }
+
+    func saveExpectedIP() {
+        vm.setExpectedEgressIP(expectedEgressDraft)
+        expectedEgressDraft = vm.expectedEgressIP
+        editingExpectedIP = vm.expectedEgressIP.isEmpty
     }
 }
 
