@@ -552,9 +552,15 @@ struct ContentView: View {
     }
 
     func pill(_ text: String, _ color: Color) -> some View {
-        Text(text).font(T.f(10, .bold)).foregroundColor(.white)
-            .padding(.horizontal, 8).padding(.vertical, 2)
-            .background(color).cornerRadius(4)
+        Text(text).font(T.f(11, .bold)).foregroundColor(.white)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .frame(minWidth: 56)
+            .background(RoundedRectangle(cornerRadius: 6).fill(color))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+            )
+            .shadow(color: color.opacity(0.35), radius: 2, y: 1)
     }
 
     var summaryColor: Color {
@@ -564,10 +570,21 @@ struct ContentView: View {
 
     func refreshBtn(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(T.accent).padding(4)
-                .background(T.accent.opacity(0.08)).cornerRadius(5)
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.clockwise")
+                Text("刷新")
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(T.accent)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(T.accent.opacity(0.16))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(T.accent.opacity(0.55), lineWidth: 1)
+            )
         }.buttonStyle(.plain)
     }
 
