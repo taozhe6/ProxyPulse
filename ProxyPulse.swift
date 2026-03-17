@@ -278,7 +278,7 @@ struct ContentView: View {
                                startPoint: .topLeading, endPoint: .center)
             }
         )
-        .frame(minWidth: 420, idealWidth: 440, minHeight: 560, idealHeight: 620)
+        .frame(minWidth: 460, idealWidth: 520, minHeight: 700, idealHeight: 736)
         .onAppear {
             withAnimation(.easeOut(duration: 0.5)) { appeared = true }
             expectedEgressDraft = vm.expectedEgressIP
@@ -590,9 +590,33 @@ struct ContentView: View {
 class AppDel: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var w: NSWindow!
 
+    // Default launch size is calculated from current visible blocks to avoid clipped first render.
+    private func calculatedDefaultContentSize() -> NSSize {
+        let header: CGFloat = 40
+        let channelCard: CGFloat = 124
+        let ipCard: CGFloat = 176
+        let healthCard: CGFloat = 228
+        let lookupCardCollapsed: CGFloat = 64
+        let interCardSpacing: CGFloat = 14 * 3
+        let verticalPadding: CGFloat = 44
+        let footer: CGFloat = 24
+
+        let height = header
+            + channelCard
+            + ipCard
+            + healthCard
+            + lookupCardCollapsed
+            + interCardSpacing
+            + verticalPadding
+            + footer
+
+        return NSSize(width: 520, height: ceil(height))
+    }
+
     func applicationDidFinishLaunching(_ n: Notification) {
+        let defaultSize = calculatedDefaultContentSize()
         w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: defaultSize.width, height: defaultSize.height),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false
         )
@@ -604,7 +628,7 @@ class AppDel: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.makeKeyAndOrderFront(nil)
         w.isReleasedWhenClosed = false
         w.delegate = self
-        w.minSize = NSSize(width: 400, height: 520)
+        w.minSize = NSSize(width: 460, height: 700)
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
